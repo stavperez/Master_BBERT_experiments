@@ -1,110 +1,116 @@
 **Project Overview**
 
-This repository contains the core codebase and scripts developed as part of my M.Sc. research at the Hebrew University of Jerusalem, focusing on LLM-based metagenomic analysis. The project explores the use of large language models (LLMs) for analyzing DNA sequencing data at scale, enabling functional interpretation, classification, and visualization of metagenomic reads across diverse organisms.
+This repository contains the full codebase and data pipeline supporting the BBERT project, developed as part of my M.Sc. research project at the Hebrew University of Jerusalem. The goal of this work is to enable fast and accurate domain-level classification of short metagenomic reads—specifically, distinguishing whether a read originates from a bacterial or eukaryotic organism.
+
+To achieve this, we introduce BBERT, a domain-classification model built by fine-tuning a BERT-style language model on DNA sequences. This repository includes the tools for generating the training and evaluation datasets, simulating reads from real RefSeq genomes, training the BBERT model, and evaluating its performance and interpretability.
 
 **Related Publication**
 
-For more details on the methodology and results, see our paper:
-"Fast and accurate taxonomic domain assignment of short metagenomic reads using BBERT"
-Available on bioRxiv: https://www.biorxiv.org/cgi/content/short/2025.09.07.674730v1
+Fast and accurate taxonomic domain assignment of short metagenomic reads using BBERT
+bioRxiv preprint, 2025.09.07.674730v1
+
+This repository provides the code and data used in the publication, including all scripts for genome processing, read simulation, model training, and analysis.
 
 **Main Components**
 
-* Python scripts for read generation, annotation, classification, and statistical analysis
-* Modeling pipelines that adapt LLM architectures (e.g., BERT-style models) to biological sequences
-* Visualization tools for embeddings, confusion types (TP/FN), and model interpretability
-* Custom datasets generated from NCBI RefSeq genomes, including bacterial and eukaryotic organisms
+* Scripts for genome collection, taxonomic filtering, and synthetic read simulation from NCBI RefSeq
+
+* A modified version of InSilicoSeq tailored for read generation with custom per-domain parameters
+
+* Python code for BBERT model training and evaluation, including tokenization and classification pipelines
+
+* Tools for analyzing model predictions, visualizing embedding space, and assessing domain-level generalization
 
 **TL;DR**
 
-The Data Generation pipeline programmatically collects RefSeq chromosome-level genomes across diverse taxa, enriches them with taxonomy, filters out genera used in training, downloads genome and annotation files, and attaches file paths and metadata. It then simulates organism-specific reads using a modified version of InSilicoSeq and combines the outputs into mixed datasets (all-organism, bacteria-only, eukaryote-only) for LLM-based metagenomic analysis.
-
+* The Data Generation Pipeline builds a high-quality, taxonomically annotated synthetic dataset from RefSeq genomes, simulates millions of short reads from bacterial and eukaryotic organisms, and uses these reads to train a BERT-based classifier (BBERT) to assign each read to its correct domain. The result is a fast and effective tool for large-scale preprocessing of metagenomic data.
 
 **Data Generation Pipeline**
 
-This pipeline builds a large, taxonomically diverse genome set from NCBI RefSeq, simulates reads using a customized version of InSilicoSeq, and produces mixed datasets for downstream BBERT analysis.
+This pipeline constructs the synthetic dataset used to train and evaluate BBERT. It spans genome selection, filtering, downloading, read simulation, and dataset construction.
 
-Overview of Pipeline Steps
-1. Collect & Annotate RefSeq Assemblies
-
-Script: all_refseq_genomes.py
-
-Downloads assembly_summary.txt from NCBI RefSeq across multiple domains: bacteria, archaea, fungi, protozoa, plants, invertebrates, and vertebrates.
-
-Filters to include only chromosome or complete genome entries.
-
-Fetches taxonomic lineage via NCBI Entrez.
-
-Outputs:
-
-all_assemblies.csv (raw)
-
-chromosome_assemblies_with_taxonomy.csv (with lineage)
+1. Collect and Annotate RefSeq Assemblies
+   
+   * Script: all_refseq_genomes.py
+   * Downloads assembly_summary.txt from NCBI RefSeq for multiple domains: bacteria, archaea, fungi, protozoa, plants, invertebrates, and vertebrates
+   * Filters for entries labeled “chromosome” or “complete genome”
+   * Fetches full taxonomic lineage using NCBI Entrez
+   * Outputs: all_assemblies.csv (raw data), chromosome_assemblies_with_taxonomy.csv (with taxonomy)
 
 2. Flag Training Set Overlap (Bacteria)
 
 Script: add_train_flag.py
 
-Adds an in_train flag for bacterial genomes based on whether their GCF/GCA IDs appear in a reference training abundance file.
+Adds a boolean in_train column to bacterial genomes by checking if their GCF/GCA accession appears in a predefined training set
+Output:
 
-Output: CSV with in_train column added.
+CSV with an added in_train column
 
-3. Exclude Training Genera & Select Unique Genus
+Step 3: Exclude Training Genera and Select Unique Genomes
 
 Script: exclude_train_unique_genus.py
 
-Excludes any genus that appears in the training set (in_train=True).
+Removes all genomes from genera that appear in the training set
 
-From the remaining set, keeps one representative genome per genus.
+From the remaining set, selects one representative genome per genus
+Output:
 
-Output: chromosome_assemblies_unique_genus_non_train.csv
+chromosome_assemblies_unique_genus_non_train.csv
 
-4. Download Genomes & Annotations
+Step 4: Download Genomes and Annotations
 
 Script: genomes_refseq_download.py
 
-Downloads *_genomic.fna.gz and annotation files (.gtf preferred, .gff as fallback) for selected assemblies.
+Downloads genomic FASTA (.fna.gz) and annotation files (.gtf.gz or .gff.gz) for each selected assembly
 
-Skips archaea if needed.
+Files are saved under:
+genomes_from_ncbi_unique_genus/<GCF_ID>/
+Note: Archaea are skipped by default in this pipeline.
 
-Genomes are stored in subfolders under genomes_from_ncbi_unique_genus/<GCF_ID>/.
-
-5. Attach Paths & Compute Stats
+Step 5: Attach File Paths and Compute Genome Stats
 
 Script: add_paths_and_stats.py
 
-Adds absolute paths for each genome and annotation file.
+Adds full paths for each genome and annotation file
 
-Computes total genome length, number of sequences, and number of headers.
+Computes basic statistics such as genome length and sequence count
 
-Categorizes organisms by domain (e.g., bacteria, eukaryotes).
-
+Adds a category column based on domain (bacteria, eukaryote, archaea)
 Outputs:
 
-chromosome_assemblies_unique_genus_with_paths.csv (master)
+chromosome_assemblies_unique_genus_with_paths.csv
 
-Filtered subsets: genomes_bacteria_unique_genus.csv, genomes_eukaryotes_unique_genus.csv, etc.
+Subsets: genomes_bacteria_unique_genus.csv, genomes_eukaryotes_unique_genus.csv, etc.
 
-6. Simulate Reads
+Step 6: Simulate Reads from Each Genome
 
-Script Chain:
+Script chain:
 
 InSilicoSeq/run_read_generator.sh
 → calls InSilicoSeq/read_generator_one_org.py
 → uses modified iss/generator.py
 
-Simulates paired-end reads for each genome using InSilicoSeq, modified for project-specific needs.
+Generates paired-end reads per genome using a customized version of InSilicoSeq
 
-Parameters: 35,000 reads per direction
+Parameters:
 
-Outputs are per-organism paired FASTQ files (R1/R2).
+Bacteria: ~3× genome coverage
 
-7. Create Mixed Datasets
+Eukaryotes: fixed 35,000 reads per direction
+Output:
+
+Per-organism FASTQ files (R1/R2), labeled by source
+
+Step 7: Create Mixed Datasets
 
 Script: mix_reads_new.py
 
-Combines reads across organisms into final mixed datasets:
+Combines per-organism read files into:
 
-All organisms, Bacteria-only, Eukaryote-only
+mixed_all.fastq
 
-Datasets are structured and labeled for use in downstream classification tasks.
+mixed_bacteria.fastq
+
+mixed_eukaryotes.fastq
+
+Datasets are balanced and ready for BBERT training and evaluation
