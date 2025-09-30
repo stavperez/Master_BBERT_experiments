@@ -25,7 +25,12 @@ This repository provides the code and data used in the publication, including al
 
 * The Data Generation Pipeline builds a high-quality, taxonomically annotated synthetic dataset from RefSeq genomes, simulates millions of short reads from bacterial and eukaryotic organisms, and uses these reads to train a BERT-based classifier (BBERT) to assign each read to its correct domain. The result is a fast and effective tool for large-scale preprocessing of metagenomic data.
 * The Assembly & Alignment Comparison Pipeline evaluates the impact of BBERT‑classified reads on downstream genome assembly and alignment. It assembles the filtered reads into contigs, aligns them back to high‑quality reference genomes, and computes genome‑level coverage, mismatch, and gap statistics. This produces clear, quantitative and visual comparisons of contig quality and error profiles between BBERT‑processed and unfiltered data, demonstrating the model’s effect on assembly accuracy and reliability.
-* The Model Error Analysis & Embedding Exploration Pipeline investigates BBERT's prediction errors by examining functional annotations, sequence embeddings, and taxonomic patterns across all confusion types. The result is a comprehensive view of BBERT’s strengths and weaknesses, combining interpretability with biological relevance.
+* The Model Error Analysis & Embedding Exploration Pipeline investigates where BBERT succeeds and fails, and why. It combines multiple analytical directions:
+  * Confusion Type Annotation: Each read is matched to its true label and evaluated against BBERT’s prediction, producing a full per-read confusion classification (TP, FP, FN, TN) used throughout downstream analysis.
+  * Dimensional Reduction - Embeddings Visualization: BBERT’s internal embeddings are projected into 2D space using PCA and t-SNE, revealing structure in how the model organizes reads. These visualizations expose clusters by organism, function, domain, and error type.
+  * Phylogenetic Bias Analysis: Model errors are analyzed across taxonomic groups. False negative rates (FNR) are computed by phylum, class, and order, and tested for statistical significance to detect systematic taxonomic biases.
+  * Functional Annotation & Metadata Enrichment: Each read is enriched with biological context—such as plasmid origin, coding status, inferred reading frame, and gene function—by integrating genome annotations and BLASTX results.
+  * Functional Error Enrichment (TP vs FN): GO terms and product annotations are compared between true positives and false negatives to identify specific functions that are systematically harder for the model. This reveals model weaknesses at the functional level.
 
 <details> <summary><strong>Data Generation Pipeline</strong></summary>
 
