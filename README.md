@@ -24,6 +24,8 @@ This repository provides the code and data used in the publication, including al
 **TL;DR**
 
 * The Data Generation Pipeline builds a high-quality, taxonomically annotated synthetic dataset from RefSeq genomes, simulates millions of short reads from bacterial and eukaryotic organisms, and uses these reads to train a BERT-based classifier (BBERT) to assign each read to its correct domain. The result is a fast and effective tool for large-scale preprocessing of metagenomic data.
+* The Assembly & Alignment Comparison Pipeline evaluates the impact of BBERT‑classified reads on downstream genome assembly and alignment. It assembles the filtered reads into contigs, aligns them back to high‑quality reference genomes, and computes genome‑level coverage, mismatch, and gap statistics. This produces clear, quantitative and visual comparisons of contig quality and error profiles between BBERT‑processed and unfiltered data, demonstrating the model’s effect on assembly accuracy and reliability.
+
 
 **Data Generation Pipeline**
 
@@ -70,3 +72,37 @@ This pipeline constructs the synthetic dataset used to train and evaluate BBERT.
    * Script: mix_reads_new.py
    * Combines per-organism read files into: mixed_all.fastq, mixed_bacteria.fastq, mixed_eukaryotes.fastq
    * Datasets are balanced and ready for BBERT training and evaluation
+
+
+**Assembly & Alignment Comparison Pipeline**
+
+This section describes the pipeline used to evaluate BBERT’s effect on downstream assembly and alignment quality. We compare contigs generated from BBERT-classified reads to those from unfiltered reads, analyzing coverage, error rates, and alignment patterns. The methodology is described in more detail in our paper.
+
+1. Run BBERT on Mixed Reads
+   * Script: run_score_256_orgs.sh
+   * BBERT is applied to paired-end reads from 256 diverse organisms, producing domain classification scores (bacterial vs eukaryotic) per read.
+
+2. Classify and Split Reads
+   * Scripts: run_split_fastq_new.sh → split_fastq_by_score_new.py
+   * Reads are split into bacterial and eukaryotic subsets based on BBERT predictions, using both strands for robust labeling.
+
+3. Assemble Classified Reads
+   * Script: run_spades_assembly_new.sh
+   * SPAdes is used to assemble the classified bacterial reads into contigs.
+
+4. Prepare Reference Database & Align Contigs
+   * Scripts:
+     * create_master_blast_db.sh - builds a BLAST DB from 512 bacterial reference genomes
+     * blast_alignment_assembly_contigs_new.sh – aligns assembled contigs back to the references
+     * blast_error_alignment_counts.sh – annotates alignments with detailed error types (mismatches, gaps, runs)
+
+5. Compare Assemblies
+   * Scripts:
+     * compare_contigs_pairwise.py - compares contigs from BBERT-classified vs unfiltered assemblies
+     * compare_genome_covrage_mismatches_gaps.py – computes genome-level stats: coverage, error rates, error distributions
+     * Results include: coverage gains/losses, error type ratios, and contig-specific differences
+
+6. Visualize Comparison Results
+   * Scripts:
+     * plot_alinment_comparison.py - generates genome-wide scatterplots and histograms of coverage and error improvements
+     * plot_single_org_alignment_windows.py – zooms into specific genomic regions to visualize local alignment quality in classified vs unfiltered assemblies
